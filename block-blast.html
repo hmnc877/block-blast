@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ブロックパズル</title>
+<style>
+  :root{
+    --bg-deep:#1a1530;
+    --bg-mid:#241c3d;
+    --panel:#2c2350;
+    --panel-edge:#4d3f78;
+    --grid-empty:#352a54;
+    --grid-line:#473a6b;
+    --accent-gold:#f2b705;
+    --accent-deep:#f2b705;
+    --text-soft:#cfc6ec;
+    --text-bright:#fdfaf3;
+    --danger:#ff5d6c;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:
+      radial-gradient(circle at 50% -10%, #3a2c63 0%, var(--bg-deep) 55%),
+      var(--bg-deep);
+    font-family:'Segoe UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+    overflow:hidden;
+    touch-action:none;
+    user-select:none;
+  }
+  #app{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:calc(env(safe-area-inset-top,12px) + 14px) 14px calc(env(safe-area-inset-bottom,12px) + 14px);
+    max-width:480px;
+    margin:0 auto;
+  }
+
+  /* ---------- header ---------- */
+  .topbar{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:6px 2px 10px;
+  }
+  .title{
+    font-size:21px;
+    font-weight:800;
+    color:var(--text-bright);
+    letter-spacing:0.5px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .title .gem{
+    width:22px;height:22px;
+    background:linear-gradient(135deg,#ffd76b,#f2b705 60%,#c98a00);
+    clip-path:polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+    box-shadow:0 0 10px rgba(242,183,5,.6);
+  }
+  .score-box{
+    background:linear-gradient(180deg,#3a2e63,#2c2350);
+    border:1px solid #4d3f78;
+    border-radius:14px;
+    padding:6px 16px;
+    text-align:center;
+    min-width:84px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 3px 8px rgba(0,0,0,.3);
+  }
+  .score-box .label{
+    font-size:10px;
+    color:var(--text-soft);
+    letter-spacing:1.5px;
+    opacity:.9;
+    font-weight:700;
+  }
+  .score-box .value{
+    font-size:22px;
+    font-weight:800;
+    color:var(--accent-deep);
+    line-height:1.15;
+    font-variant-numeric:tabular-nums;
+  }
+  .best-box{
+    background:transparent;
+    text-align:right;
+    min-width:70px;
+  }
+  .best-box .label{
+    font-size:10px;
+    color:var(--text-soft);
+    letter-spacing:1.5px;
+    opacity:.8;
+    font-weight:700;
+  }
+  .best-box .value{
+    font-size:16px;
+    font-weight:700;
+    color:#b79bc4;
+    font-variant-numeric:tabular-nums;
+  }
+
+  /* ---------- board ---------- */
+  .board-wrap{
+    width:100%;
+    aspect-ratio:1/1;
+    max-width:420px;
+    background:linear-gradient(160deg,#251c44,#1d1636);
+    border-radius:14px;
+    border:3px solid #4d3f78;
+    padding:8px;
+    box-shadow:
+      inset 0 2px 6px rgba(0,0,0,.4),
+      0 10px 24px rgba(0,0,0,.4);
+    position:relative;
+    margin-top:8px;
+  }
+  #board{
+    width:100%;
+    height:100%;
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    grid-template-rows:repeat(8,1fr);
+    gap:1px;
+    position:relative;
+  }
+  .cell{
+    border-radius:0;
+    background:var(--grid-empty);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.15);
+    position:relative;
+    transition:background .35s ease;
+  }
+  .cell.filled{
+    border-radius:0;
+    box-shadow:
+      inset 0 0 0 3px rgba(0,0,0,.16),
+      inset 0 3px 0 rgba(255,255,255,.45),
+      inset 0 -4px 6px rgba(0,0,0,.22);
+  }
+  .cell.preview-ok{
+    background:rgba(242,183,5,.28);
+    filter:brightness(1.1);
+  }
+  .cell.preview-bad{
+    background:rgba(255,93,108,.4) !important;
+  }
+  .cell.preview-clear{
+    animation:previewClearPulse 1s ease-in-out infinite;
+  }
+  @keyframes previewClearPulse{
+    0%{ filter:brightness(1.3) saturate(1.3); box-shadow:inset 0 0 0 3px rgba(255,255,255,.6), 0 0 10px rgba(255,224,102,.6);}
+    50%{ filter:brightness(1.7) saturate(1.6); box-shadow:inset 0 0 0 3px rgba(255,255,255,.9), 0 0 16px rgba(255,224,102,.9);}
+    100%{ filter:brightness(1.3) saturate(1.3); box-shadow:inset 0 0 0 3px rgba(255,255,255,.6), 0 0 10px rgba(255,224,102,.6);}
+  }
+  .cell.clearing{
+    animation:clearPulse .32s ease forwards;
+  }
+  @keyframes clearPulse{
+    0%{ transform:scale(1); filter:brightness(1);}
+    40%{ transform:scale(1.12); filter:brightness(2.2);}
+    100%{ transform:scale(0.2); filter:brightness(3); opacity:0;}
+  }
+  .cell.clearing-mega{
+    animation:clearPulseMega .42s ease forwards;
+  }
+  @keyframes clearPulseMega{
+    0%{ transform:scale(1); filter:brightness(1) saturate(1);}
+    35%{ transform:scale(1.25); filter:brightness(2.6) saturate(1.8);}
+    100%{ transform:scale(0.15) rotate(25deg); filter:brightness(4) saturate(2.2); opacity:0;}
+  }
+  .cell.rainbow-flash{
+    animation:rainbowFlash .42s ease forwards !important;
+  }
+  @keyframes rainbowFlash{
+    0%{ background:#ff5d6c; transform:scale(1); }
+    16%{ background:#ffb347; transform:scale(1.18);}
+    32%{ background:#ffe066; transform:scale(1.22);}
+    48%{ background:#6bcb77; transform:scale(1.18);}
+    64%{ background:#4ecdc4; transform:scale(1.18);}
+    80%{ background:#a78bfa; transform:scale(1.18);}
+    100%{ background:#ff6bcb; transform:scale(0.15) rotate(25deg); opacity:0;}
+  }
+  @keyframes screenShake{
+    0%{ transform:translate(0,0); }
+    20%{ transform:translate(calc(var(--shake-px,6px)*-1), calc(var(--shake-px,6px)*.5)); }
+    40%{ transform:translate(var(--shake-px,6px), calc(var(--shake-px,6px)*-.65)); }
+    60%{ transform:translate(calc(var(--shake-px,6px)*-.7), calc(var(--shake-px,6px)*-.5)); }
+    80%{ transform:translate(calc(var(--shake-px,6px)*.65), var(--shake-px,6px)); }
+    100%{ transform:translate(0,0); }
+  }
+  #app.shake{
+    animation:screenShake .42s ease;
+  }
+  .board-wrap.flash-border{
+    animation:borderFlash .5s ease;
+  }
+  @keyframes borderFlash{
+    0%{ box-shadow:
+        inset 0 2px 6px rgba(0,0,0,.4),
+        0 0 0 4px #ffe066,
+        0 0 40px rgba(255,224,102,.9);}
+    100%{ box-shadow:
+        inset 0 2px 6px rgba(0,0,0,.4),
+        0 10px 24px rgba(0,0,0,.4);}
+  }
+
+  /* ---------- tray ---------- */
+  .tray{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:6px;
+    margin-top:14px;
+    min-height:130px;
+    padding:0 2px;
+  }
+  .tray-slot{
+    flex:1;
+    height:130px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    border-radius:14px;
+    background:linear-gradient(180deg,#2c2350,#241c3d);
+    border:1px solid #4d3f78;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 3px 8px rgba(0,0,0,.3);
+  }
+  .tray-slot.dragging-from{
+    opacity:.25;
+  }
+  .piece{
+    display:grid;
+    cursor:grab;
+    touch-action:none;
+  }
+  .piece-cell{
+    border-radius:0;
+  }
+  .piece-cell.empty{ background:transparent; }
+
+  /* ---------- dragging clone ---------- */
+  .drag-clone{
+    position:fixed;
+    pointer-events:none;
+    z-index:999;
+    display:grid;
+    opacity:.95;
+    filter:drop-shadow(0 8px 14px rgba(0,0,0,.5));
+  }
+  .drag-clone .piece-cell{ border-radius:0; }
+
+  /* ---------- combo toast ---------- */
+  .toast{
+    position:fixed;
+    top:30%;
+    left:50%;
+    transform:translate(-50%,-50%) scale(.7);
+    font-size:34px;
+    font-weight:900;
+    color:var(--accent-gold);
+    text-shadow:0 0 18px rgba(242,183,5,.8), 0 2px 0 rgba(0,0,0,.4);
+    opacity:0;
+    pointer-events:none;
+    z-index:1000;
+    letter-spacing:1px;
+  }
+  .toast.show{
+    animation:toastPop .85s cubic-bezier(.2,1.4,.4,1) forwards;
+  }
+  @keyframes toastPop{
+    0%{opacity:0; transform:translate(-50%,-50%) scale(.5);}
+    25%{opacity:1; transform:translate(-50%,-50%) scale(1.15);}
+    45%{opacity:1; transform:translate(-50%,-50%) scale(1);}
+    100%{opacity:0; transform:translate(-50%,-65%) scale(1);}
+  }
+  .toast.mega{
+    background:linear-gradient(90deg,#ff5d6c,#ffb347,#ffe066,#6bcb77,#4ecdc4,#a78bfa,#ff6bcb);
+    background-size:300% 100%;
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    animation:toastPop .9s cubic-bezier(.2,1.4,.4,1) forwards, rainbowShift 1s linear infinite;
+  }
+  @keyframes rainbowShift{
+    0%{ background-position:0% 50%; }
+    100%{ background-position:300% 50%; }
+  }
+
+  /* ---------- game over ---------- */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(15,10,28,.82);
+    backdrop-filter:blur(3px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1100;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .3s ease;
+  }
+  .overlay.show{ opacity:1; pointer-events:auto; }
+  .gameover-card{
+    background:linear-gradient(180deg,#352a54,#241c3d);
+    border:1px solid #4d3f78;
+    border-radius:20px;
+    padding:32px 28px;
+    text-align:center;
+    width:80%;
+    max-width:300px;
+    box-shadow:0 20px 50px rgba(0,0,0,.5);
+    transform:scale(.85);
+    transition:transform .3s cubic-bezier(.2,1.4,.4,1);
+  }
+  .overlay.show .gameover-card{ transform:scale(1); }
+  .gameover-card h2{
+    margin:0 0 4px;
+    color:var(--text-bright);
+    font-size:22px;
+  }
+  .gameover-card .sub{
+    color:var(--text-soft);
+    font-size:13px;
+    margin-bottom:18px;
+  }
+  .gameover-card .final-score{
+    font-size:44px;
+    font-weight:900;
+    color:var(--accent-gold);
+    margin-bottom:4px;
+    text-shadow:0 0 16px rgba(242,183,5,.5);
+  }
+  .gameover-card .final-best{
+    font-size:12px;
+    color:var(--text-soft);
+    margin-bottom:22px;
+  }
+  .retry-btn{
+    background:linear-gradient(180deg,#ffd76b,#f2b705);
+    border:none;
+    border-radius:14px;
+    padding:13px 0;
+    width:100%;
+    font-size:16px;
+    font-weight:800;
+    color:#2c2350;
+    box-shadow:0 6px 0 #c98a00, 0 10px 18px rgba(0,0,0,.35);
+    cursor:pointer;
+    letter-spacing:.5px;
+  }
+  .retry-btn:active{
+    transform:translateY(4px);
+    box-shadow:0 2px 0 #c98a00, 0 4px 10px rgba(0,0,0,.3);
+  }
+
+  .footer-hint{
+    margin-top:14px;
+    font-size:11px;
+    color:var(--text-soft);
+    opacity:.5;
+    text-align:center;
+  }
+
+  /* ---------- title / mode select ---------- */
+  .title-screen{
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .title-screen-inner{
+    width:100%;
+    max-width:380px;
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    gap:16px;
+  }
+  .title-logo{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    margin-bottom:18px;
+    position:relative;
+  }
+  .gem.big{
+    width:54px;height:54px;
+    display:none; /* 王冠アイコンに置き換えるため非表示 */
+  }
+  .logo-crown{
+    width:46px;
+    margin-bottom:-14px;
+    margin-left:6px;
+    z-index:3;
+    filter:drop-shadow(0 4px 4px rgba(0,0,0,.35));
+    animation:logoFloat 2.6s ease-in-out infinite;
+  }
+  .logo-line1{
+    display:flex;
+    justify-content:center;
+  }
+  .logo-line2{
+    display:flex;
+    justify-content:center;
+    margin-top:2px;
+  }
+  .logo-text .letter{
+    display:inline-block;
+    font-size:54px;
+    font-weight:900;
+    font-family:'Arial Rounded MT Bold','Segoe UI',-apple-system,sans-serif;
+    line-height:1;
+    letter-spacing:-2px;
+    -webkit-text-stroke:3px rgba(0,0,0,.28);
+    position:relative;
+    animation:logoFloat 2.6s ease-in-out infinite;
+  }
+  .logo-line2 .letter{
+    font-size:40px;
+    -webkit-text-stroke:2.5px rgba(0,0,0,.25);
+  }
+  .logo-text .letter:nth-child(2n){ animation-delay:.12s; }
+  .logo-text .letter:nth-child(3n){ animation-delay:.24s; }
+  .logo-text .letter:nth-child(4n){ animation-delay:.36s; }
+  .logo-text .letter:nth-child(5n){ animation-delay:.48s; }
+  /* 1文字ずつ違う色 + ぷっくりした立体感をtext-shadowの多重レイヤーで表現 */
+  .letter.c-orange{ color:#ffb84d; text-shadow:0 3px 0 #e89a2e, 0 6px 0 #c97f18, 0 9px 10px rgba(0,0,0,.4); }
+  .letter.c-blue{   color:#5ec8f0; text-shadow:0 3px 0 #3aa8d6, 0 6px 0 #2483ab, 0 9px 10px rgba(0,0,0,.4); }
+  .letter.c-red{    color:#ff5c5c; text-shadow:0 3px 0 #e23939, 0 6px 0 #b82424, 0 9px 10px rgba(0,0,0,.4); }
+  .letter.c-yellow{ color:#ffd84d; text-shadow:0 3px 0 #e8b92e, 0 6px 0 #c79612, 0 9px 10px rgba(0,0,0,.4); }
+  .letter.c-purple{ color:#c47bf0; text-shadow:0 3px 0 #a356d6, 0 6px 0 #8338b3, 0 9px 10px rgba(0,0,0,.4); }
+  .letter.c-skyblue{color:#7dd3f7; text-shadow:0 2px 0 #4fb8e8, 0 4px 0 #2f9bce, 0 6px 8px rgba(0,0,0,.35); }
+  @keyframes logoFloat{
+    0%,100%{ transform:translateY(0) rotate(0deg); }
+    50%{ transform:translateY(-5px) rotate(-1deg); }
+  }
+  .logo-sub{
+    color:#9fc4f0;
+    font-size:13px;
+    letter-spacing:3px;
+    font-weight:700;
+    font-style:italic;
+    text-transform:uppercase;
+    opacity:.85;
+    margin-top:6px;
+    text-shadow:0 2px 4px rgba(0,0,0,.3);
+  }
+  .mode-btn{
+    background:linear-gradient(180deg,#2c2350,#241c3d);
+    border:1px solid #4d3f78;
+    border-radius:18px;
+    padding:20px 22px;
+    text-align:left;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 6px 16px rgba(0,0,0,.3);
+  }
+  .mode-btn:active{ transform:translateY(2px); }
+  .mode-btn-title{
+    font-size:19px;
+    font-weight:800;
+    color:var(--text-bright);
+  }
+  .mode-btn-desc{
+    font-size:12px;
+    color:var(--text-soft);
+  }
+  .mode-btn-stage{
+    border-color:var(--accent-gold);
+    background:linear-gradient(180deg,#3a2e63,#2c2350);
+  }
+  .mode-btn-stage .mode-btn-title{ color:var(--accent-gold); }
+
+  /* ---------- stage select ---------- */
+  .stage-select-header{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .stage-select-header h2{
+    color:var(--text-bright);
+    font-size:18px;
+    margin:0;
+  }
+  .back-btn{
+    background:transparent;
+    border:1px solid #4d3f78;
+    color:var(--text-bright);
+    border-radius:10px;
+    padding:6px 12px;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .back-btn.small{
+    padding:4px 10px;
+    margin-right:4px;
+  }
+  .stage-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:10px;
+    max-height:65vh;
+    overflow-y:auto;
+    padding:4px;
+  }
+  .stage-cell{
+    aspect-ratio:1/1;
+    border-radius:12px;
+    background:linear-gradient(180deg,#2c2350,#241c3d);
+    border:1px solid #4d3f78;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    color:var(--text-bright);
+    font-weight:800;
+    font-size:16px;
+    cursor:pointer;
+    position:relative;
+  }
+  .stage-cell.locked{
+    opacity:.4;
+    cursor:default;
+  }
+  .stage-cell.cleared{
+    border-color:var(--accent-gold);
+    box-shadow:0 0 12px rgba(242,183,5,.4);
+  }
+  .stage-cell .stage-stars{
+    font-size:10px;
+    color:var(--accent-gold);
+    margin-top:2px;
+  }
+  .stage-cell .lock-icon{
+    font-size:14px;
+    opacity:.6;
+  }
+
+  /* ---------- stage progress in-game ---------- */
+  .stage-progress{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:8px 14px;
+    margin-top:4px;
+    background:linear-gradient(180deg,#2c2350,#241c3d);
+    border:1px solid #4d3f78;
+    border-radius:12px;
+  }
+  .stage-progress-label{
+    font-size:12px;
+    color:var(--text-soft);
+    font-weight:700;
+  }
+  .heart-tracker{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    font-size:15px;
+    font-weight:800;
+    color:var(--text-bright);
+    font-variant-numeric:tabular-nums;
+  }
+  .heart-icon{
+    color:#ff5d8f;
+    text-shadow:0 0 8px rgba(255,93,143,.7);
+    font-size:16px;
+  }
+
+  /* ---------- heart block ---------- */
+  .cell.has-heart::after{
+    content:'♥';
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-size:55%;
+    text-shadow:0 0 4px rgba(0,0,0,.5), 0 0 8px rgba(255,93,143,.8);
+    animation:heartBeat 1s ease-in-out infinite;
+    pointer-events:none;
+  }
+  @keyframes heartBeat{
+    0%,100%{ transform:scale(1); }
+    50%{ transform:scale(1.18); }
+  }
+  .piece-cell.has-heart::after{
+    content:'♥';
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-size:50%;
+    text-shadow:0 0 4px rgba(0,0,0,.5);
+  }
+  .heart-pop{
+    position:fixed;
+    pointer-events:none;
+    z-index:1050;
+    font-size:22px;
+    color:#ff5d8f;
+    text-shadow:0 0 8px rgba(255,93,143,.9);
+    animation:heartPopFly 1s ease-out forwards;
+  }
+  @keyframes heartPopFly{
+    0%{ transform:translate(0,0) scale(1); opacity:1; }
+    100%{ transform:translate(var(--fx,0px), var(--fy,-80px)) scale(.6); opacity:0; }
+  }
+
+  /* ---------- stage clear card ---------- */
+  .stage-clear-card{
+    border-color:var(--accent-gold) !important;
+  }
+  .stage-clear-stars{
+    font-size:30px;
+    color:var(--accent-gold);
+    text-shadow:0 0 16px rgba(242,183,5,.6);
+    margin-bottom:6px;
+  }
+  .retry-btn.secondary{
+    margin-top:10px;
+    background:transparent;
+    border:1px solid #4d3f78;
+    color:var(--text-bright);
+    box-shadow:none;
+  }
+  .retry-btn.secondary:active{
+    transform:translateY(2px);
+    box-shadow:none;
+  }
+
+  /* ---------- combo counter (in-game) ---------- */
+  .combo-bar{
+    width:100%;
+    max-width:420px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 4px;
+    margin-top:6px;
+    height:24px;
+  }
+  .level-badge{
+    font-size:12px;
+    font-weight:800;
+    color:var(--accent-gold);
+    letter-spacing:1px;
+    text-shadow:0 0 8px rgba(242,183,5,.5);
+  }
+  .combo-indicator{
+    font-size:12px;
+    font-weight:800;
+    color:var(--text-soft);
+    opacity:0;
+    transition:opacity .3s ease;
+    display:flex;
+    align-items:center;
+    gap:4px;
+  }
+  .combo-indicator.active{
+    opacity:1;
+    color:#ff9f6b;
+    text-shadow:0 0 8px rgba(255,159,107,.6);
+  }
+  .combo-flame{
+    animation:flamePulse .4s ease-in-out infinite alternate;
+  }
+  @keyframes flamePulse{
+    from{ transform:scale(1); }
+    to{ transform:scale(1.3) rotate(5deg); }
+  }
+
+  /* ---------- level up ---------- */
+  .levelup-toast{
+    position:fixed;
+    top:35%;
+    left:50%;
+    transform:translate(-50%,-50%) scale(.5);
+    pointer-events:none;
+    z-index:1010;
+    text-align:center;
+    opacity:0;
+  }
+  .levelup-toast.show{
+    animation:levelUpPop 1.2s cubic-bezier(.2,1.4,.4,1) forwards;
+  }
+  .levelup-num{
+    font-size:56px;
+    font-weight:900;
+    color:var(--accent-gold);
+    text-shadow:0 0 30px rgba(242,183,5,.9), 0 4px 0 #8a5d00;
+    line-height:1;
+  }
+  .levelup-label{
+    font-size:15px;
+    font-weight:800;
+    color:#fff;
+    letter-spacing:4px;
+    text-shadow:0 2px 4px rgba(0,0,0,.5);
+  }
+  @keyframes levelUpPop{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(.4); }
+    25%{ opacity:1; transform:translate(-50%,-50%) scale(1.2); }
+    50%{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+    85%{ opacity:1; transform:translate(-50%,-60%) scale(1); }
+    100%{ opacity:0; transform:translate(-50%,-75%) scale(.9); }
+  }
+
+  /* ---------- achievement badge ---------- */
+  .achievement{
+    position:fixed;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
+    left:50%;
+    transform:translateX(-50%) translateY(80px);
+    background:linear-gradient(160deg,#352a54,#241c3d);
+    border:1px solid var(--accent-gold);
+    border-radius:16px;
+    padding:10px 18px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    z-index:1005;
+    box-shadow:0 8px 24px rgba(0,0,0,.5), 0 0 0 1px rgba(242,183,5,.2);
+    opacity:0;
+    transition:transform .4s cubic-bezier(.2,1.4,.4,1), opacity .3s ease;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  .achievement.show{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+  }
+  .achievement-icon{ font-size:22px; }
+  .achievement-text{ display:flex; flex-direction:column; gap:1px; }
+  .achievement-title{ font-size:11px; color:var(--accent-gold); font-weight:800; letter-spacing:1px; }
+  .achievement-desc{ font-size:13px; color:var(--text-bright); font-weight:700; }
+
+  /* ---------- result stats ---------- */
+  .result-stats{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+    width:100%;
+  }
+  .result-stat{
+    flex:1;
+    background:rgba(255,255,255,.05);
+    border-radius:10px;
+    padding:8px 6px;
+    text-align:center;
+  }
+  .result-stat-value{
+    font-size:20px;
+    font-weight:900;
+    color:var(--text-bright);
+  }
+  .result-stat-label{
+    font-size:9px;
+    color:var(--text-soft);
+    letter-spacing:1px;
+    margin-top:2px;
+  }
+  .result-new-best{
+    color:var(--accent-gold);
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:2px;
+    margin-bottom:8px;
+    text-shadow:0 0 8px rgba(242,183,5,.5);
+    height:16px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ---------- タイトル / モード選択画面 ---------- -->
+<div id="titleScreen" class="title-screen">
+  <div class="title-screen-inner">
+    <div class="title-logo">
+      <svg class="logo-crown" viewBox="0 0 100 70" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="10,65 5,25 30,42 50,10 70,42 95,25 90,65" fill="#ffd23f" stroke="#c98a00" stroke-width="3" stroke-linejoin="round"/>
+        <circle cx="5" cy="22" r="8" fill="#ffd23f" stroke="#c98a00" stroke-width="3"/>
+        <circle cx="50" cy="8" r="9" fill="#ffd23f" stroke="#c98a00" stroke-width="3"/>
+        <circle cx="95" cy="22" r="8" fill="#ffd23f" stroke="#c98a00" stroke-width="3"/>
+        <ellipse cx="35" cy="20" rx="6" ry="3" fill="#fff2b0" opacity=".8"/>
+      </svg>
+      <div class="logo-text logo-line1">
+        <span class="letter c-orange">B</span><span class="letter c-blue">L</span><span class="letter c-red">O</span><span class="letter c-yellow">C</span><span class="letter c-purple">K</span>
+      </div>
+      <div class="logo-text logo-line2">
+        <span class="letter c-skyblue">B</span><span class="letter c-skyblue">L</span><span class="letter c-skyblue">A</span><span class="letter c-skyblue">S</span><span class="letter c-skyblue">T</span>
+      </div>
+      <div class="logo-sub">Puzzle Adventure</div>
+    </div>
+    <button class="mode-btn mode-btn-free" id="goFreeBtn">
+      <span class="mode-btn-title">フリープレイ</span>
+      <span class="mode-btn-desc">気ままに遊んでハイスコアを目指す</span>
+    </button>
+    <button class="mode-btn mode-btn-stage" id="goStageBtn">
+      <span class="mode-btn-title">ステージモード</span>
+      <span class="mode-btn-desc">ハートを集めてステージクリア</span>
+    </button>
+  </div>
+</div>
+
+<!-- ---------- ステージ選択画面 ---------- -->
+<div id="stageSelectScreen" class="title-screen" style="display:none;">
+  <div class="title-screen-inner">
+    <div class="stage-select-header">
+      <button class="back-btn" id="stageSelectBackBtn">‹ もどる</button>
+      <h2>ステージ選択</h2>
+    </div>
+    <div class="stage-grid" id="stageGrid"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="topbar">
+    <button class="back-btn small" id="backToTitleBtn">‹</button>
+    <div class="title" id="modeTitle"><span class="gem"></span>ブロックパズル</div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div class="best-box" id="bestBox">
+        <div class="label">ベスト</div>
+        <div class="value" id="bestVal">0</div>
+      </div>
+      <div class="score-box" id="scoreBox">
+        <div class="label">スコア</div>
+        <div class="value" id="scoreVal">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage-progress" id="stageProgress" style="display:none;">
+    <div class="stage-progress-label">ステージ <span id="stageNumLabel">1</span></div>
+    <div class="heart-tracker">
+      <span class="heart-icon">♥</span>
+      <span id="heartCount">0</span> / <span id="heartTarget">5</span>
+    </div>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board"></div>
+  </div>
+
+  <div class="combo-bar" id="comboBar">
+    <div class="level-badge" id="levelBadge">Lv.1</div>
+    <div class="combo-indicator" id="comboIndicator">
+      <span class="combo-flame">🔥</span>
+      <span id="comboText">2 COMBO</span>
+    </div>
+  </div>
+
+  <div class="tray" id="tray"></div>
+
+  <div class="footer-hint" id="footerHint">ブロックをドラッグしてマスに置こう</div>
+</div>
+
+<div class="levelup-toast" id="levelupToast">
+  <div class="levelup-label">LEVEL UP</div>
+  <div class="levelup-num" id="levelupNum">2</div>
+</div>
+
+<div class="achievement" id="achievementBadge">
+  <div class="achievement-icon" id="achievementIcon">🏆</div>
+  <div class="achievement-text">
+    <div class="achievement-title">ACHIEVEMENT</div>
+    <div class="achievement-desc" id="achievementDesc">初めてのトリプル!</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="overlay" id="overlay">
+  <div class="gameover-card">
+    <h2 id="gameOverTitle">ゲームオーバー</h2>
+    <div class="sub" id="gameOverSub">置ける場所がなくなりました</div>
+    <div class="result-new-best" id="resultNewBest"></div>
+    <div class="final-score" id="finalScore">0</div>
+    <div class="result-stats" id="resultStats"></div>
+    <button class="retry-btn" id="retryBtn">もう一度プレイ</button>
+    <button class="retry-btn secondary" id="backToTitleBtn2">タイトルへ</button>
+  </div>
+</div>
+
+<div class="overlay" id="stageClearOverlay">
+  <div class="gameover-card stage-clear-card">
+    <div class="stage-clear-stars">★★★</div>
+    <h2>ステージクリア!</h2>
+    <div class="sub" id="stageClearSub">ステージ1 クリア</div>
+    <div class="final-score" id="stageClearScore">0</div>
+    <div class="final-best">スコア</div>
+    <button class="retry-btn" id="nextStageBtn">次のステージへ</button>
+    <button class="retry-btn secondary" id="stageClearBackBtn">ステージ選択へ</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const SIZE = 8;
+  // スコア1000点ごとにテーマが切り替わる
+  const COLOR_THEMES = [
+    [ // 0〜999: 宇宙(デフォルト)
+      ['#ff6b6b','#e84545'],
+      ['#4ecdc4','#2ba8a0'],
+      ['#ffd76b','#e8a93a'],
+      ['#a78bfa','#7c5cd6'],
+      ['#6bcB77','#3f9e4d'],
+      ['#5dade2','#2f7dbf'],
+      ['#ff9f6b','#e8703a'],
+    ],
+    [ // 1000〜1999: オーロラ
+      ['#7afcff','#36c9d6'],
+      ['#7affc1','#2fbf83'],
+      ['#c17aff','#8b3fe8'],
+      ['#7a9fff','#3f6fe8'],
+      ['#d6ff7a','#9fcf2f'],
+      ['#7affe0','#2fcfa8'],
+      ['#a17aff','#6b3fd6'],
+    ],
+    [ // 2000〜2999: サンセット
+      ['#ff9d6b','#e8602f'],
+      ['#ff6b9d','#e82f6e'],
+      ['#ffd16b','#e8a02f'],
+      ['#ff6b6b','#d62f3f'],
+      ['#ffb36b','#e8852f'],
+      ['#ff8bb0','#e8497d'],
+      ['#ffe16b','#e8c12f'],
+    ],
+    [ // 3000〜3999: ネオン
+      ['#ff2fd6','#c4009f'],
+      ['#2fffe1','#00c4a8'],
+      ['#fff42f','#c4ad00'],
+      ['#2f9fff','#0066c4'],
+      ['#ff2f5e','#c40031'],
+      ['#9f2fff','#6600c4'],
+      ['#2fff5e','#00c431'],
+    ],
+    [ // 4000〜: ゴールド&ダイヤ
+      ['#fff0c2','#e8c050'],
+      ['#fde08a','#dba520'],
+      ['#ffffff','#d8d8d8'],
+      ['#fff7d6','#f0d878'],
+      ['#e8d29a','#bf9a3f'],
+      ['#fff4b0','#e0b830'],
+      ['#ffe9a0','#d4a818'],
+    ],
+  ];
+  const THEME_NAMES = ['宇宙','オーロラ','サンセット','ネオン','ゴールド'];
+
+  function getCurrentTheme(){
+    const idx = Math.min(Math.floor(score/1000), COLOR_THEMES.length-1);
+    return COLOR_THEMES[idx];
+  }
+
+  function getCOLORS(){
+    return getCurrentTheme();
+  }
+
+  // Piece shape library (relative coords)
+  // 難易度別シェイプ。序盤は易しい(小さい)形だけ、進むほど大きく複雑な形が混ざる。
+  // ---- ブロック形状ライブラリ ----
+  // SMALL: 小さい形(隙間埋め用)
+  const SHAPES_SMALL = [
+    [[0,0]],                                         // 1x1
+    [[0,0],[0,1]],                                   // 1x2 横
+    [[0,0],[1,0]],                                   // 1x2 縦
+    [[0,0],[0,1],[0,2]],                             // 1x3 横
+    [[0,0],[1,0],[2,0]],                             // 1x3 縦
+  ];
+
+  // BIG: 3x3・2x3・3x2中心の爽快系(ラインを丸ごと埋めやすい)
+  const SHAPES_BIG = [
+    [[0,0],[0,1],[1,0],[1,1]],                       // 2x2
+    [[0,0],[0,1],[0,2],[0,3]],                       // 1x4 横
+    [[0,0],[1,0],[2,0],[3,0]],                       // 1x4 縦
+    [[0,0],[0,1],[0,2],
+     [1,0],[1,1],[1,2]],                             // 2x3 横
+    [[0,0],[0,1],
+     [1,0],[1,1],
+     [2,0],[2,1]],                                   // 3x2 縦
+    [[0,0],[0,1],[0,2],
+     [1,0],[1,1],[1,2],
+     [2,0],[2,1],[2,2]],                             // 3x3 正方形 ★
+  ];
+
+  // TRICKY: 置き場を選ぶ、パズル性の高い形(中〜後半向け)
+  const SHAPES_TRICKY = [
+    [[0,0],[0,1],[0,2],[1,0]],                       // L
+    [[0,0],[0,1],[0,2],[1,2]],                       // J
+    [[0,0],[1,0],[2,0],[2,1]],                       // L rot
+    [[0,1],[1,1],[2,1],[0,0]],                       // J rot
+    [[0,0],[0,1],[1,1],[1,2]],                       // S
+    [[0,1],[0,2],[1,0],[1,1]],                       // Z
+    [[0,0],[1,0],[1,1],[2,1]],                       // S 縦
+    [[0,1],[1,0],[1,1],[2,1]],                       // Z 縦
+    [[0,0],[1,0],[2,0],[1,1]],                       // T
+    [[0,0],[0,1],[0,2],[1,1]],                       // T side
+    [[1,0],[0,1],[1,1],[2,1]],                       // T flip
+    [[0,0],[0,1],[1,1],[2,1],[2,0]],                 // U
+  ];
+
+  const SHAPES = [...SHAPES_SMALL, ...SHAPES_BIG, ...SHAPES_TRICKY];
+
+  let grid = [];
+  let cellEls = [];
+  let score = 0;
+  let best = parseInt(localStorage.getItem('bb_free_best') || localStorage.getItem('bb_best') || '0', 10);
+  let tray = []; // current 3 pieces {shape, color, used}
+  let dragging = null;
+
+  // ---- ゲームモード管理 ----
+  let gameMode = 'free'; // 'free' | 'stage'
+  let currentStage = 1;
+  let heartsCollected = 0;
+  let heartTarget = 5;
+  let heartCells = new Set(); // 'r_c' のセットで、ハートが乗っているマスを管理
+
+  // ---- コンボ・統計 ----
+  let combo = 0;           // 現在のコンボ数
+  let maxCombo = 0;        // このゲームの最大コンボ
+  let totalLinesCleared = 0; // このゲームで消したライン総数
+  let level = 1;             // 現在のレベル
+  let isNewBest = false;     // ベスト更新フラグ
+
+  const LEVEL_THRESHOLD = 200; // 何点ごとにレベルアップ
+
+  // 実績定義
+  const ACHIEVEMENTS = [
+    { id:'first_triple',  icon:'⚡', desc:'初めてのトリプル!',  check:()=> totalLinesCleared >= 3 },
+    { id:'combo3',        icon:'🔥', desc:'3コンボ達成!',       check:()=> maxCombo >= 3 },
+    { id:'combo5',        icon:'💥', desc:'5コンボ達成!',       check:()=> maxCombo >= 5 },
+    { id:'level5',        icon:'⭐', desc:'レベル5到達!',       check:()=> level >= 5 },
+    { id:'level10',       icon:'👑', desc:'レベル10到達!',      check:()=> level >= 10 },
+    { id:'clear_board',   icon:'✨', desc:'全消し達成!',        check:()=> grid.every(row=>row.every(c=>!c)) },
+    { id:'score500',      icon:'🏆', desc:'スコア500突破!',     check:()=> score >= 500 },
+    { id:'score2000',     icon:'💎', desc:'スコア2000突破!',    check:()=> score >= 2000 },
+  ];
+  let unlockedAchievements = new Set(
+    JSON.parse(localStorage.getItem('bb_achievements')||'[]')
+  );
+
+  const STAGE_COUNT = 20;
+  function getStageConfig(stageNum){
+    // ステージが進むほど必要ハート数が増え、ブロックの難易度も上がる(上限あり)
+    const target = Math.min(5 + Math.floor((stageNum-1) * 0.8), 20); // 5→最大20
+    let weights;
+    if(stageNum <= 3)      weights = {small:0.1, big:0.75, tricky:0.15};
+    else if(stageNum <= 6) weights = {small:0.1, big:0.55, tricky:0.35};
+    else if(stageNum <= 10)weights = {small:0.1, big:0.40, tricky:0.50};
+    else if(stageNum <= 15)weights = {small:0.1, big:0.25, tricky:0.65};
+    else                   weights = {small:0.1, big:0.15, tricky:0.75};
+    const heartChance = Math.min(0.16 + stageNum*0.004, 0.26);
+    return { target, weights, heartChance };
+  }
+
+  function getStageStars(stageNum){
+    const data = JSON.parse(localStorage.getItem('bb_stage_data')||'{}');
+    return data[stageNum] ? data[stageNum].stars : 0;
+  }
+  function getStageCleared(stageNum){
+    const data = JSON.parse(localStorage.getItem('bb_stage_data')||'{}');
+    return !!(data[stageNum] && data[stageNum].cleared);
+  }
+  function saveStageClear(stageNum, stars){
+    const data = JSON.parse(localStorage.getItem('bb_stage_data')||'{}');
+    const prevStars = data[stageNum] ? data[stageNum].stars : 0;
+    data[stageNum] = { cleared:true, stars: Math.max(prevStars, stars) };
+    localStorage.setItem('bb_stage_data', JSON.stringify(data));
+  }
+  function isStageUnlocked(stageNum){
+    if(stageNum === 1) return true;
+    return getStageCleared(stageNum-1);
+  }
+
+  const boardEl = document.getElementById('board');
+  const trayEl = document.getElementById('tray');
+  const scoreVal = document.getElementById('scoreVal');
+  const bestVal = document.getElementById('bestVal');
+  const toastEl = document.getElementById('toast');
+  const overlayEl = document.getElementById('overlay');
+  const finalScoreEl = document.getElementById('finalScore');
+  const finalBestEl = document.getElementById('finalBest');
+  const gameOverTitleEl = document.getElementById('gameOverTitle');
+  const gameOverSubEl = document.getElementById('gameOverSub');
+  const appEl = document.getElementById('app');
+  const boardWrapEl = document.querySelector('.board-wrap');
+  const titleScreenEl = document.getElementById('titleScreen');
+  const stageSelectScreenEl = document.getElementById('stageSelectScreen');
+  const stageGridEl = document.getElementById('stageGrid');
+  const stageProgressEl = document.getElementById('stageProgress');
+  const stageNumLabelEl = document.getElementById('stageNumLabel');
+  const heartCountEl = document.getElementById('heartCount');
+  const heartTargetEl = document.getElementById('heartTarget');
+  const stageClearOverlayEl = document.getElementById('stageClearOverlay');
+  const stageClearSubEl = document.getElementById('stageClearSub');
+  const stageClearScoreEl = document.getElementById('stageClearScore');
+  const stageClearStarsEl = document.querySelector('.stage-clear-stars');
+  const modeTitleEl = document.getElementById('modeTitle');
+  const footerHintEl = document.getElementById('footerHint');
+  const bestBoxEl = document.getElementById('bestBox');
+  const levelBadgeEl = document.getElementById('levelBadge');
+  const comboIndicatorEl = document.getElementById('comboIndicator');
+  const comboTextEl = document.getElementById('comboText');
+  const levelupToastEl = document.getElementById('levelupToast');
+  const levelupNumEl = document.getElementById('levelupNum');
+  const achievementBadgeEl = document.getElementById('achievementBadge');
+  const achievementIconEl = document.getElementById('achievementIcon');
+  const achievementDescEl = document.getElementById('achievementDesc');
+  const resultStatsEl = document.getElementById('resultStats');
+  const resultNewBestEl = document.getElementById('resultNewBest');
+
+  bestVal.textContent = best;
+
+  function initGrid(){
+    grid = Array.from({length:SIZE}, ()=>Array(SIZE).fill(null));
+  }
+
+  function buildBoardDOM(){
+    boardEl.innerHTML = '';
+    cellEls = [];
+    for(let r=0;r<SIZE;r++){
+      const row = [];
+      for(let c=0;c<SIZE;c++){
+        const d = document.createElement('div');
+        d.className='cell';
+        d.dataset.r=r; d.dataset.c=c;
+        boardEl.appendChild(d);
+        row.push(d);
+      }
+      cellEls.push(row);
+    }
+  }
+
+  // 序盤に特に多く出したい「ライン消去しやすい大型」
+  const SHAPES_BIG_FEATURED = [
+    [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2]],           // 2x3 横
+    [[0,0],[0,1],[1,0],[1,1],[2,0],[2,1]],           // 3x2 縦
+    [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]], // 3x3
+  ];
+
+  function getDifficultyWeights(){
+    if(gameMode === 'stage'){
+      return getStageConfig(currentStage).weights;
+    }
+    // 序盤はBIG高頻度、後半はTRICKYが増えてパズル性UP
+    if(score < 200)  return {small:0.08, big:0.80, tricky:0.12};
+    if(score < 500)  return {small:0.10, big:0.62, tricky:0.28};
+    if(score < 1000) return {small:0.10, big:0.45, tricky:0.45};
+    if(score < 2000) return {small:0.10, big:0.30, tricky:0.60};
+    return                  {small:0.10, big:0.18, tricky:0.72};
+  }
+
+  function pickWeightedShape(){
+    const w = getDifficultyWeights();
+    const r = Math.random();
+
+    // 盤面の空き状況を見て、大型が置けない状況では自動的にサイズを下げる
+    let useBig = (r >= w.small && r < w.small + w.big);
+    if(useBig){
+      // 3x3(9マス)や2x3(6マス)が実際に置けるか簡易チェック
+      const can3x3 = anyPlacement(SHAPES_BIG_FEATURED[2]); // 3x3
+      const can2x3 = anyPlacement(SHAPES_BIG_FEATURED[0]) || anyPlacement(SHAPES_BIG_FEATURED[1]); // 2x3か3x2
+      if(!can3x3 && !can2x3){
+        // 大型が置けないのでBIG内でも小さめの形に絞る
+        const smallBig = SHAPES_BIG.filter(s=>s.length<=4);
+        if(smallBig.length > 0) return smallBig[Math.floor(Math.random()*smallBig.length)];
+        // fallbackでSMALL
+        return SHAPES_SMALL[Math.floor(Math.random()*SHAPES_SMALL.length)];
+      }
+    }
+
+    if(r < w.small){
+      return SHAPES_SMALL[Math.floor(Math.random()*SHAPES_SMALL.length)];
+    } else if(r < w.small + w.big){
+      if(Math.random() < 0.55){
+        return SHAPES_BIG_FEATURED[Math.floor(Math.random()*SHAPES_BIG_FEATURED.length)];
+      }
+      return SHAPES_BIG[Math.floor(Math.random()*SHAPES_BIG.length)];
+    } else {
+      return SHAPES_TRICKY[Math.floor(Math.random()*SHAPES_TRICKY.length)];
+    }
+  }
+
+  function randomShape(){
+    const shape = pickWeightedShape();
+    const palette = getCOLORS();
+    const color = palette[Math.floor(Math.random()*palette.length)];
+    const piece = {shape, color};
+    if(gameMode === 'stage'){
+      const heartChance = getStageConfig(currentStage).heartChance;
+      if(Math.random() < heartChance){
+        const heartLocalIdx = Math.floor(Math.random()*shape.length);
+        piece.heartIdx = heartLocalIdx;
+      }
+    }
+    return piece;
+  }
+
+  // 盤面に実際に置けるシェイプだけを候補としてランダム選択
+  function randomPlaceableShape(){
+    // 全シェイププールから置けるものだけ抽出して加重抽選
+    const palette = getCOLORS();
+    const color = palette[Math.floor(Math.random()*palette.length)];
+
+    // 置ける形を確認しながら加重ランダムに選ぶ(最大50回試行)
+    for(let i=0;i<50;i++){
+      const shape = pickWeightedShape();
+      if(anyPlacement(shape)){
+        const piece = {shape, color};
+        if(gameMode === 'stage'){
+          const heartChance = getStageConfig(currentStage).heartChance;
+          if(Math.random() < heartChance){
+            piece.heartIdx = Math.floor(Math.random()*shape.length);
+          }
+        }
+        return piece;
+      }
+    }
+    // fallback: どんな小さい形でもいいので置けるものを返す
+    for(const shape of SHAPES_SMALL){
+      if(anyPlacement(shape)) return {shape, color};
+    }
+    return {shape:[[0,0]], color}; // 万が一
+  }
+
+  // 盤面の空き状況を分析して「置きやすさスコア」を返す
+  // 返り値: { maxContiguousCols, maxContiguousRows, emptyCells }
+  function analyzeBoardSpace(){
+    let emptyCells = 0;
+    let maxContiguousCols = 0; // 同一行の最大連続空きマス数
+    let maxContiguousRows = 0; // 同一列の最大連続空きマス数
+
+    for(let r=0;r<SIZE;r++){
+      let run=0;
+      for(let c=0;c<SIZE;c++){
+        if(!grid[r][c]){ run++; emptyCells++; maxContiguousCols=Math.max(maxContiguousCols,run); }
+        else run=0;
+      }
+    }
+    for(let c=0;c<SIZE;c++){
+      let run=0;
+      for(let r=0;r<SIZE;r++){
+        if(!grid[r][c]){ run++; maxContiguousRows=Math.max(maxContiguousRows,run); }
+        else run=0;
+      }
+    }
+    return {maxContiguousCols, maxContiguousRows, emptyCells};
+  }
+
+  function randomShapeSet(){
+    const {maxContiguousCols, maxContiguousRows, emptyCells} = analyzeBoardSpace();
+    const pieces = [];
+
+    for(let i=0;i<3;i++){
+      // 各ピースを「盤面に確実に置ける」ものに絞って生成
+      pieces.push(randomPlaceableShape());
+    }
+    return pieces;
+  }
+
+  function shapeBounds(shape){
+    let maxR=0,maxC=0;
+    shape.forEach(([r,c])=>{ maxR=Math.max(maxR,r); maxC=Math.max(maxC,c); });
+    return {rows:maxR+1, cols:maxC+1};
+  }
+
+  function canPlace(shape, baseR, baseC){
+    for(const [dr,dc] of shape){
+      const r=baseR+dr, c=baseC+dc;
+      if(r<0||r>=SIZE||c<0||c>=SIZE) return false;
+      if(grid[r][c]) return false;
+    }
+    return true;
+  }
+
+  function anyPlacement(shape){
+    for(let r=0;r<SIZE;r++){
+      for(let c=0;c<SIZE;c++){
+        if(canPlace(shape,r,c)) return true;
+      }
+    }
+    return false;
+  }
+
+  function refillTrayIfNeeded(){
+    if(tray.every(p=>!p || p.used)){
+      tray = randomShapeSet();
+    }
+  }
+
+  function buildTrayDOM(){
+    trayEl.innerHTML='';
+    tray.forEach((piece, idx)=>{
+      const slot = document.createElement('div');
+      slot.className='tray-slot';
+      slot.dataset.idx = idx;
+      if(piece && !piece.used){
+        const {rows, cols} = shapeBounds(piece.shape);
+        const maxDim = Math.max(rows, cols);
+        // トレイスロット内に収まるようにセルサイズを自動調整(最大26px、大型は縮小)
+        const slotInner = 110; // スロット内の実質使える幅/高さ
+        const cellPx = Math.max(14, Math.min(26, Math.floor((slotInner - (maxDim-1)) / maxDim)));
+        const pieceEl = renderPiece(piece, cellPx);
+        pieceEl.classList.add('piece');
+        pieceEl.style.pointerEvents = 'none';
+        attachDrag(slot, piece, idx);
+        slot.appendChild(pieceEl);
+      }
+      trayEl.appendChild(slot);
+    });
+  }
+
+  function renderPiece(piece, cellPx){
+    const {rows, cols} = shapeBounds(piece.shape);
+    const el = document.createElement('div');
+    el.style.gridTemplateColumns = `repeat(${cols}, ${cellPx}px)`;
+    el.style.gridTemplateRows = `repeat(${rows}, ${cellPx}px)`;
+    el.style.display='grid';
+    el.style.gap='1px';
+    const set = new Set(piece.shape.map(([r,c])=>r+'_'+c));
+    const heartKey = (piece.heartIdx!=null && piece.shape[piece.heartIdx])
+      ? piece.shape[piece.heartIdx][0]+'_'+piece.shape[piece.heartIdx][1]
+      : null;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const cd = document.createElement('div');
+        if(set.has(r+'_'+c)){
+          cd.className='piece-cell';
+          cd.style.width=cellPx+'px';
+          cd.style.height=cellPx+'px';
+          cd.style.background = `linear-gradient(160deg, ${piece.color[0]}, ${piece.color[1]})`;
+          cd.style.boxShadow = 'inset 0 0 0 3px rgba(0,0,0,.16), inset 0 3px 0 rgba(255,255,255,.45), inset 0 -4px 6px rgba(0,0,0,.22)';
+          cd.style.position = 'relative';
+          if(heartKey === (r+'_'+c)){
+            cd.classList.add('has-heart');
+          }
+        } else {
+          cd.className='piece-cell empty';
+          cd.style.width=cellPx+'px';
+          cd.style.height=cellPx+'px';
+        }
+        el.appendChild(cd);
+      }
+    }
+    return el;
+  }
+
+  // ---------------- Drag logic ----------------
+  function attachDrag(slotEl, piece, idx){
+    slotEl.addEventListener('pointerdown', (e)=>{
+      e.preventDefault();
+      startDrag(e, slotEl, piece, idx);
+    });
+  }
+
+  function getBoardCellSize(){
+    const rect = cellEls[0][0].getBoundingClientRect();
+    return rect;
+  }
+
+  function startDrag(e, slotEl, piece, idx){
+    if(dragging) return;
+    slotEl.classList.add('dragging-from');
+
+    const cellPx = getBoardCellSize().width;
+    const clone = renderPiece(piece, cellPx);
+    clone.classList.add('drag-clone');
+    clone.style.left = '0px';
+    clone.style.top = '0px';
+    clone.style.willChange = 'transform';
+    document.body.appendChild(clone);
+
+    const {rows, cols} = shapeBounds(piece.shape);
+    const gap = 1;
+    const cloneW = cols*cellPx + (cols-1)*gap;
+    const cloneH = rows*cellPx + (rows-1)*gap;
+
+    // offset: lift finger above touch point so it's visible
+    const liftY = cellPx*1.3;
+
+    // 盤面の座標はドラッグ中に変化しないため、開始時に一度だけ計測してキャッシュする
+    const c0 = cellEls[0][0].getBoundingClientRect();
+    const stepX = cellEls[0][1] ? cellEls[0][1].getBoundingClientRect().left - c0.left : c0.width+1;
+    const stepY = cellEls[1][0] ? cellEls[1][0].getBoundingClientRect().top - c0.top : c0.height+1;
+    const boardOrigin = {left:c0.left, top:c0.top, stepX, stepY};
+
+    dragging = {
+      piece, idx, clone, cellPx, rows, cols, gap, cloneW, cloneH, liftY,
+      lastValid:null, boardOrigin,
+      lastRow:null, lastCol:null,
+      pendingX:e.clientX, pendingY:e.clientY,
+      rafScheduled:false
+    };
+
+    applyDragFrame(e.clientX, e.clientY);
+
+    const onMove = (ev)=>{
+      if(!dragging) return;
+      dragging.pendingX = ev.clientX;
+      dragging.pendingY = ev.clientY;
+      if(!dragging.rafScheduled){
+        dragging.rafScheduled = true;
+        requestAnimationFrame(()=>{
+          if(!dragging) return;
+          dragging.rafScheduled = false;
+          applyDragFrame(dragging.pendingX, dragging.pendingY);
+        });
+      }
+    };
+    const onUp = (ev)=>{
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      endDrag(ev.clientX, ev.clientY);
+      slotEl.classList.remove('dragging-from');
+    };
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }
+
+  function applyDragFrame(x, y){
+    if(!dragging) return;
+    const targetY = y - dragging.liftY - dragging.cloneH/2;
+    const targetX = x - dragging.cloneW/2;
+    dragging.clone.style.transform = `translate(${targetX}px, ${targetY}px)`;
+
+    // anchor point for placement = top-left of piece bounding box, lifted
+    const anchorX = targetX;
+    const anchorY = targetY;
+
+    const { left, top, stepX, stepY } = dragging.boardOrigin;
+    const col = Math.round((anchorX - left)/stepX);
+    const row = Math.round((anchorY - top)/stepY);
+
+    // 行・列が前回と同じなら、プレビュー判定(DOM走査を伴う)はスキップして負荷を抑える
+    if(row === dragging.lastRow && col === dragging.lastCol) return;
+    dragging.lastRow = row;
+    dragging.lastCol = col;
+
+    clearPreview();
+    const valid = canPlace(dragging.piece.shape, row, col);
+    dragging.lastValid = valid ? {row,col} : null;
+    showPreview(dragging.piece.shape, row, col, valid);
+    if(valid){
+      showClearPreview(dragging.piece.shape, row, col);
+    }
+  }
+
+  function clearPreview(){
+    document.querySelectorAll('.cell.preview-ok, .cell.preview-bad, .cell.preview-clear').forEach(c=>{
+      c.classList.remove('preview-ok','preview-bad','preview-clear');
+    });
+  }
+
+  function showPreview(shape, baseR, baseC, valid){
+    shape.forEach(([dr,dc])=>{
+      const r=baseR+dr, c=baseC+dc;
+      if(r>=0&&r<SIZE&&c>=0&&c<SIZE){
+        cellEls[r][c].classList.add(valid?'preview-ok':'preview-bad');
+      }
+    });
+  }
+
+  function showClearPreview(shape, baseR, baseC){
+    // 仮置き後、何行・何列が完成するかを判定してハイライトする
+    const occupied = new Set();
+    shape.forEach(([dr,dc])=>{
+      const r=baseR+dr, c=baseC+dc;
+      if(r>=0&&r<SIZE&&c>=0&&c<SIZE) occupied.add(r+'_'+c);
+    });
+
+    const wouldBeFilled = (r,c)=> !!grid[r][c] || occupied.has(r+'_'+c);
+
+    const fullRows = [];
+    for(let r=0;r<SIZE;r++){
+      let full=true;
+      for(let c=0;c<SIZE;c++){ if(!wouldBeFilled(r,c)){full=false;break;} }
+      if(full) fullRows.push(r);
+    }
+    const fullCols = [];
+    for(let c=0;c<SIZE;c++){
+      let full=true;
+      for(let r=0;r<SIZE;r++){ if(!wouldBeFilled(r,c)){full=false;break;} }
+      if(full) fullCols.push(c);
+    }
+    if(fullRows.length===0 && fullCols.length===0) return;
+
+    fullRows.forEach(r=>{
+      for(let c=0;c<SIZE;c++) cellEls[r][c].classList.add('preview-clear');
+    });
+    fullCols.forEach(c=>{
+      for(let r=0;r<SIZE;r++) cellEls[r][c].classList.add('preview-clear');
+    });
+  }
+
+  function endDrag(x,y){
+    if(!dragging) return;
+
+    // 指を離した瞬間の正確な座標で最終判定(rAF間引きによるズレを防ぐ)
+    const targetY = y - dragging.liftY - dragging.cloneH/2;
+    const targetX = x - dragging.cloneW/2;
+    const { left, top, stepX, stepY } = dragging.boardOrigin;
+    const col = Math.round((targetX - left)/stepX);
+    const row = Math.round((targetY - top)/stepY);
+    const valid = canPlace(dragging.piece.shape, row, col);
+    const finalPlacement = valid ? {row,col} : null;
+
+    clearPreview();
+    dragging.clone.remove();
+
+    if(finalPlacement){
+      placePiece(dragging.piece, dragging.idx, finalPlacement.row, finalPlacement.col);
+    }
+    dragging = null;
+  }
+
+  function placePiece(piece, idx, baseR, baseC){
+    piece.shape.forEach(([dr,dc], i)=>{
+      const r=baseR+dr, c=baseC+dc;
+      grid[r][c] = piece.color;
+      if(piece.heartIdx === i){
+        heartCells.add(r+'_'+c);
+      }
+    });
+    tray[idx].used = true;
+    score += piece.shape.length;
+    updateScoreDOM();
+    renderGridDOM();
+    vibrate(12);
+    refillTrayIfNeeded();
+    buildTrayDOM();
+
+    setTimeout(()=>{
+      checkAndClearLines();
+    }, 80);
+  }
+
+  function renderGridDOM(){
+    for(let r=0;r<SIZE;r++){
+      for(let c=0;c<SIZE;c++){
+        const el = cellEls[r][c];
+        const val = grid[r][c];
+        if(val){
+          el.classList.add('filled');
+          el.style.background = `linear-gradient(160deg, ${val[0]}, ${val[1]})`;
+        } else {
+          el.classList.remove('filled');
+          el.style.background = '';
+        }
+        if(heartCells.has(r+'_'+c)){
+          el.classList.add('has-heart');
+        } else {
+          el.classList.remove('has-heart');
+        }
+      }
+    }
+  }
+
+  function checkAndClearLines(){
+    const fullRows = [];
+    const fullCols = [];
+    for(let r=0;r<SIZE;r++){
+      if(grid[r].every(v=>v)) fullRows.push(r);
+    }
+    for(let c=0;c<SIZE;c++){
+      let full=true;
+      for(let r=0;r<SIZE;r++){ if(!grid[r][c]){full=false;break;} }
+      if(full) fullCols.push(c);
+    }
+
+    const totalLines = fullRows.length + fullCols.length;
+    if(totalLines===0){
+      combo = 0; // コンボリセット
+      updateComboUI();
+      checkGameOver();
+      return;
+    }
+
+    combo++;
+    if(combo > maxCombo) maxCombo = combo;
+    totalLinesCleared += totalLines;
+    updateComboUI();
+
+    const isMega = totalLines>=3 || combo>=3;
+
+    const cellsToClear = new Set();
+    fullRows.forEach(r=>{ for(let c=0;c<SIZE;c++) cellsToClear.add(r+'_'+c); });
+    fullCols.forEach(c=>{ for(let r=0;r<SIZE;r++) cellsToClear.add(r+'_'+c); });
+
+    // ステージモード: 消える予定のマスにハートがあれば獲得
+    let heartsGainedThisClear = 0;
+    if(gameMode === 'stage'){
+      cellsToClear.forEach(key=>{
+        if(heartCells.has(key)){
+          heartsGainedThisClear++;
+          heartCells.delete(key);
+          const [r,c] = key.split('_').map(Number);
+          spawnHeartPop(cellEls[r][c]);
+        }
+      });
+      if(heartsGainedThisClear > 0){
+        heartsCollected += heartsGainedThisClear;
+        updateHeartDOM();
+      }
+    }
+
+    cellsToClear.forEach(key=>{
+      const [r,c] = key.split('_').map(Number);
+      const el = cellEls[r][c];
+      if(isMega){
+        el.classList.add('rainbow-flash');
+      } else {
+        el.classList.add('clearing');
+      }
+    });
+
+    // コンボ倍率: 1コンボ=等倍, 2=1.5倍, 3=2倍, 4以上=0.5ずつ増加(上限5倍)
+    const comboMult = Math.min(1 + (combo - 1) * 0.5, 5);
+    const baseBonus = totalLines * SIZE * 10 + (totalLines > 1 ? totalLines * 20 : 0);
+    const bonus = Math.round(baseBonus * comboMult);
+    score += bonus;
+    updateScoreDOM(true);
+    const changedThemeIdx = checkThemeChange();
+
+    if(changedThemeIdx !== null){
+      announceThemeChange(changedThemeIdx);
+      setTimeout(()=>{ showToast(totalLines, combo); }, 750);
+    } else {
+      showToast(totalLines, combo);
+    }
+
+    if(isMega){
+      triggerScreenShake(combo);
+      boardWrapEl.classList.remove('flash-border');
+      void boardWrapEl.offsetWidth;
+      boardWrapEl.classList.add('flash-border');
+    }
+
+    const clearDelay = isMega ? 420 : 320;
+    setTimeout(()=>{
+      cellsToClear.forEach(key=>{
+        const [r,c] = key.split('_').map(Number);
+        grid[r][c] = null;
+        cellEls[r][c].classList.remove('clearing','rainbow-flash','has-heart');
+      });
+      renderGridDOM();
+      if(gameMode === 'stage' && heartsCollected >= heartTarget){
+        triggerStageClear();
+      } else {
+        checkGameOver();
+      }
+    }, clearDelay);
+  }
+
+  function spawnHeartPop(cellEl){
+    const rect = cellEl.getBoundingClientRect();
+    const pop = document.createElement('div');
+    pop.className = 'heart-pop';
+    pop.textContent = '♥';
+    pop.style.left = (rect.left + rect.width/2 - 11) + 'px';
+    pop.style.top = (rect.top + rect.height/2 - 11) + 'px';
+    pop.style.setProperty('--fx', (Math.random()*40-20)+'px');
+    pop.style.setProperty('--fy', (-70-Math.random()*30)+'px');
+    document.body.appendChild(pop);
+    setTimeout(()=> pop.remove(), 1050);
+  }
+
+  function updateHeartDOM(){
+    if(heartCountEl) heartCountEl.textContent = heartsCollected;
+  }
+
+  function triggerScreenShake(intensity){
+    // intensityに応じてシェイクの強さを変える(CSSカスタムプロパティで制御)
+    const px = intensity >= 5 ? 10 : intensity >= 3 ? 7 : 5;
+    appEl.style.setProperty('--shake-px', px+'px');
+    appEl.classList.remove('shake');
+    void appEl.offsetWidth;
+    appEl.classList.add('shake');
+  }
+
+  function vibrate(pattern){
+    if(navigator.vibrate){
+      try{ navigator.vibrate(pattern); }catch(e){}
+    }
+  }
+
+  function showToast(lines, currentCombo){
+    // メッセージ: コンボが優先、その次にライン数
+    let text, useMega;
+    if(currentCombo >= 5){
+      text = `${currentCombo} COMBO!!`;
+      useMega = true;
+    } else if(currentCombo >= 3){
+      text = `${currentCombo} COMBO!`;
+      useMega = true;
+    } else if(currentCombo === 2){
+      text = lines >= 2 ? `${['','','ダブル','トリプル','クアッド'][Math.min(lines,4)]}! ×2` : '2 COMBO!';
+      useMega = true;
+    } else {
+      const labels = {1:'ライン!', 2:'ダブル!', 3:'トリプル!', 4:'クアッド!'};
+      text = labels[lines] || `${lines} ライン!`;
+      useMega = lines >= 3;
+    }
+
+    // コンボ数に応じてサイズを変化
+    const fontSize = currentCombo >= 5 ? 44 : currentCombo >= 3 ? 38 : 32;
+    toastEl.style.fontSize = fontSize + 'px';
+    toastEl.textContent = text;
+    toastEl.classList.remove('show','mega');
+    void toastEl.offsetWidth;
+    toastEl.classList.add('show');
+    if(useMega) toastEl.classList.add('mega');
+  }
+
+  function updateScoreDOM(skipAutoThemeAnnounce){
+    scoreVal.textContent = score;
+    if(gameMode === 'free' && score>best){
+      if(!isNewBest) isNewBest = true;
+      best = score;
+      bestVal.textContent = best;
+      localStorage.setItem('bb_free_best', String(best));
+    }
+    // レベルアップ判定
+    const newLevel = Math.max(1, Math.floor(score / LEVEL_THRESHOLD) + 1);
+    if(newLevel > level){
+      level = newLevel;
+      showLevelUp(level);
+    }
+    if(levelBadgeEl) levelBadgeEl.textContent = `Lv.${level}`;
+    if(!skipAutoThemeAnnounce){
+      const changedIdx = checkThemeChange();
+      if(changedIdx !== null) announceThemeChange(changedIdx);
+    }
+    // 実績チェック
+    checkAchievements();
+  }
+
+  function updateComboUI(){
+    if(!comboIndicatorEl) return;
+    if(combo >= 2){
+      comboTextEl.textContent = `${combo} COMBO`;
+      comboIndicatorEl.classList.add('active');
+    } else {
+      comboIndicatorEl.classList.remove('active');
+    }
+  }
+
+  function showLevelUp(lv){
+    if(!levelupToastEl) return;
+    levelupNumEl.textContent = lv;
+    levelupToastEl.classList.remove('show');
+    void levelupToastEl.offsetWidth;
+    levelupToastEl.classList.add('show');
+    triggerScreenShake(2);
+  }
+
+  let achievementQueue = [];
+  let achievementShowing = false;
+  function checkAchievements(){
+    for(const ach of ACHIEVEMENTS){
+      if(!unlockedAchievements.has(ach.id) && ach.check()){
+        unlockedAchievements.add(ach.id);
+        localStorage.setItem('bb_achievements', JSON.stringify([...unlockedAchievements]));
+        achievementQueue.push(ach);
+      }
+    }
+    if(!achievementShowing) drainAchievementQueue();
+  }
+
+  function drainAchievementQueue(){
+    if(achievementQueue.length === 0){ achievementShowing = false; return; }
+    achievementShowing = true;
+    const ach = achievementQueue.shift();
+    showAchievement(ach, ()=> setTimeout(drainAchievementQueue, 300));
+  }
+
+  function showAchievement(ach, onDone){
+    if(!achievementBadgeEl) return;
+    achievementIconEl.textContent = ach.icon;
+    achievementDescEl.textContent = ach.desc;
+    achievementBadgeEl.classList.add('show');
+    setTimeout(()=>{
+      achievementBadgeEl.classList.remove('show');
+      setTimeout(onDone, 400);
+    }, 2200);
+  }
+
+
+  let lastThemeIdx = 0;
+  function checkThemeChange(){
+    // テーマが変わっていれば新しいidxを返し、内部状態を更新する。変化なければnull。
+    const idx = Math.min(Math.floor(score/1000), COLOR_THEMES.length-1);
+    if(idx !== lastThemeIdx){
+      lastThemeIdx = idx;
+      return idx;
+    }
+    return null;
+  }
+
+  function announceThemeChange(idx){
+    const name = THEME_NAMES[idx] || 'テーマ';
+    toastEl.textContent = `${name} テーマ!`;
+    toastEl.classList.remove('show','mega');
+    void toastEl.offsetWidth;
+    toastEl.classList.add('show','mega');
+    triggerScreenShake(4);
+  }
+
+  function repaintBoardToCurrentTheme(){
+    // 盤面に既に置かれているブロックも新テーマの色へ塗り替える
+    const palette = getCOLORS();
+    for(let r=0;r<SIZE;r++){
+      for(let c=0;c<SIZE;c++){
+        if(grid[r][c]){
+          grid[r][c] = palette[Math.floor(Math.random()*palette.length)];
+        }
+      }
+    }
+    renderGridDOM();
+    // トレイに残っているまだ置いていないピースも塗り替える
+    tray.forEach(p=>{
+      if(p && !p.used){
+        p.color = palette[Math.floor(Math.random()*palette.length)];
+      }
+    });
+    buildTrayDOM();
+  }
+
+  function checkGameOver(){
+    const remaining = tray.filter(p=>p && !p.used);
+    const placeable = remaining.some(p=>anyPlacement(p.shape));
+    if(remaining.length>0 && !placeable){
+      triggerGameOver();
+    } else if(remaining.length===0){
+      // tray will refill on next render cycle; nothing to do
+    }
+  }
+
+  function triggerGameOver(){
+    finalScoreEl.textContent = score;
+    if(gameMode === 'stage'){
+      gameOverTitleEl.textContent = 'ステージ失敗';
+      gameOverSubEl.textContent = `ハート ${heartsCollected} / ${heartTarget} 集めたところで置けなくなりました`;
+      if(resultNewBestEl) resultNewBestEl.textContent = '';
+    } else {
+      gameOverTitleEl.textContent = 'ゲームオーバー';
+      gameOverSubEl.textContent = '置ける場所がなくなりました';
+      if(resultNewBestEl) resultNewBestEl.textContent = isNewBest ? '🎉 NEW BEST!' : '';
+    }
+    if(resultStatsEl){
+      resultStatsEl.innerHTML = `
+        <div class="result-stat">
+          <div class="result-stat-value">Lv.${level}</div>
+          <div class="result-stat-label">レベル</div>
+        </div>
+        <div class="result-stat">
+          <div class="result-stat-value">${maxCombo}</div>
+          <div class="result-stat-label">最大コンボ</div>
+        </div>
+        <div class="result-stat">
+          <div class="result-stat-value">${totalLinesCleared}</div>
+          <div class="result-stat-label">消去ライン</div>
+        </div>
+      `;
+    }
+    overlayEl.classList.add('show');
+  }
+
+  function triggerStageClear(){
+    // スコアを基準に星評価(目標ハート数が多いステージほど基準スコアも上がる)
+    const scoreBar = heartTarget * 25;
+    const stars = score >= scoreBar*2 ? 3 : (score >= scoreBar ? 2 : 1);
+    saveStageClear(currentStage, stars);
+    stageClearSubEl.textContent = `ステージ ${currentStage} クリア`;
+    stageClearScoreEl.textContent = score;
+    stageClearStarsEl.textContent = '★'.repeat(stars) + '☆'.repeat(3-stars);
+    stageClearOverlayEl.classList.add('show');
+    triggerScreenShake(5);
+    vibrate([40,30,40,30,80,30,80]);
+  }
+
+  function randomInitialFill(){
+    // 序盤は軽め(6〜10個)にして、置き方次第で全消しを狙いやすくする
+    const fillCount = 6 + Math.floor(Math.random()*5); // 6〜10
+    let attempts = 0;
+    let filled = 0;
+    while(filled < fillCount && attempts < 400){
+      attempts++;
+      const r = Math.floor(Math.random()*SIZE);
+      const c = Math.floor(Math.random()*SIZE);
+      if(grid[r][c]) continue;
+
+      // 仮置きしてみて、そのせいで行/列が全部埋まるなら避ける
+      const initPalette = getCOLORS();
+      grid[r][c] = initPalette[Math.floor(Math.random()*initPalette.length)];
+      const rowFull = grid[r].every(v=>v);
+      let colFull = true;
+      for(let rr=0;rr<SIZE;rr++){ if(!grid[rr][c]){colFull=false;break;} }
+      if(rowFull || colFull){
+        grid[r][c] = null; // 取り消し
+        continue;
+      }
+      filled++;
+    }
+  }
+
+  function resetGame(){
+    score = 0;
+    lastThemeIdx = 0;
+    heartCells = new Set();
+    heartsCollected = 0;
+    combo = 0;
+    maxCombo = 0;
+    totalLinesCleared = 0;
+    level = 1;
+    isNewBest = false;
+    achievementQueue = [];
+    achievementShowing = false;
+    if(levelBadgeEl) levelBadgeEl.textContent = 'Lv.1';
+    if(comboIndicatorEl) comboIndicatorEl.classList.remove('active');
+    updateScoreDOM();
+    updateHeartDOM();
+    initGrid();
+    if(gameMode === 'free'){
+      randomInitialFill();
+    }
+    renderGridDOM();
+    tray = randomShapeSet();
+    buildTrayDOM();
+    overlayEl.classList.remove('show');
+    stageClearOverlayEl.classList.remove('show');
+  }
+
+  function applyModeUI(){
+    if(gameMode === 'stage'){
+      modeTitleEl.innerHTML = '<span class="gem"></span>ステージ ' + currentStage;
+      stageProgressEl.style.display = 'flex';
+      stageNumLabelEl.textContent = currentStage;
+      heartTarget = getStageConfig(currentStage).target;
+      heartTargetEl.textContent = heartTarget;
+      heartCountEl.textContent = '0';
+      bestBoxEl.style.display = 'none';
+      footerHintEl.textContent = 'ハートの乗ったブロックの列・行を消して集めよう';
+    } else {
+      modeTitleEl.innerHTML = '<span class="gem"></span>フリープレイ';
+      stageProgressEl.style.display = 'none';
+      bestBoxEl.style.display = '';
+      footerHintEl.textContent = 'ブロックをドラッグしてマスに置こう';
+    }
+  }
+
+  function startFreeGame(){
+    gameMode = 'free';
+    best = parseInt(localStorage.getItem('bb_free_best') || localStorage.getItem('bb_best') || '0', 10);
+    bestVal.textContent = best;
+    applyModeUI();
+    showScreen('app');
+    resetGame();
+  }
+
+  function startStage(stageNum){
+    gameMode = 'stage';
+    currentStage = stageNum;
+    applyModeUI();
+    showScreen('app');
+    resetGame();
+  }
+
+  function showScreen(name){
+    titleScreenEl.style.display = name==='title' ? 'flex' : 'none';
+    stageSelectScreenEl.style.display = name==='stageSelect' ? 'flex' : 'none';
+    appEl.style.display = name==='app' ? 'flex' : 'none';
+  }
+
+  function buildStageSelectGrid(){
+    stageGridEl.innerHTML = '';
+    for(let i=1;i<=STAGE_COUNT;i++){
+      const unlocked = isStageUnlocked(i);
+      const cleared = getStageCleared(i);
+      const stars = getStageStars(i);
+      const cell = document.createElement('div');
+      cell.className = 'stage-cell' + (unlocked ? '' : ' locked') + (cleared ? ' cleared' : '');
+      if(unlocked){
+        cell.innerHTML = `${i}<div class="stage-stars">${cleared ? '★'.repeat(stars)+'☆'.repeat(3-stars) : ''}</div>`;
+        cell.addEventListener('click', ()=> startStage(i));
+      } else {
+        cell.innerHTML = `<span class="lock-icon">🔒</span>`;
+      }
+      stageGridEl.appendChild(cell);
+    }
+  }
+
+  document.getElementById('goFreeBtn').addEventListener('click', startFreeGame);
+  document.getElementById('goStageBtn').addEventListener('click', ()=>{
+    buildStageSelectGrid();
+    showScreen('stageSelect');
+  });
+  document.getElementById('stageSelectBackBtn').addEventListener('click', ()=> showScreen('title'));
+  document.getElementById('backToTitleBtn').addEventListener('click', ()=> showScreen('title'));
+  document.getElementById('backToTitleBtn2').addEventListener('click', ()=>{
+    overlayEl.classList.remove('show');
+    showScreen('title');
+  });
+  document.getElementById('nextStageBtn').addEventListener('click', ()=>{
+    stageClearOverlayEl.classList.remove('show');
+    if(currentStage < STAGE_COUNT){
+      startStage(currentStage+1);
+    } else {
+      showScreen('title');
+    }
+  });
+  document.getElementById('stageClearBackBtn').addEventListener('click', ()=>{
+    stageClearOverlayEl.classList.remove('show');
+    buildStageSelectGrid();
+    showScreen('stageSelect');
+  });
+
+  document.getElementById('retryBtn').addEventListener('click', resetGame);
+
+  // init: タイトル画面から開始(ゲーム本体は選択されてから初期化する)
+  buildBoardDOM();
+  initGrid();
+  showScreen('title');
+})();
+</script>
+</body>
+</html>
